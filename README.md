@@ -27,7 +27,13 @@ uv run dns-tools
 
 1. 仓库页面 → **Actions** → **Build Windows EXE**；
 2. 点击 **Run workflow** → 选择分支 → **Run workflow**；
-3. 运行完成后在该次运行的页面下载 artifact `dns-tools-windows-exe`。
+3. 运行完成后下载 artifact `dns-tools-windows-exe`，同时**自动创建 GitHub Release**。
+
+发布规则：
+
+- **版本号自动取自** `src/dns_tools/__init__.py` 的 `__version__`（当前 0.3.0 → tag `v0.3.0`），Release 资产名为 `dns-tools-v0.3.0.exe`；
+- **同版本号 Release 已存在时构建会失败**——请先升级 `__version__`（同步 `pyproject.toml`）或删除旧 Release，避免覆盖已发布版本；
+- Release 由 workflow 中 `GITHUB_TOKEN`（`contents: write`）自动创建并上传，无需网页手动操作。
 
 本地等效命令（与 Actions 中完全一致）：
 

@@ -1,8 +1,12 @@
 name: Build Windows EXE
 
 # 仅手动触发：仓库页面 Actions -> Build Windows EXE -> Run workflow
+# 构建完成后自动创建 GitHub Release，版本号取自 src/dns_tools/__init__.py 的 __version__
 on:
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -18,6 +22,15 @@ jobs:
       - name: Install dependencies
         run: uv sync
         # 建议将 uv.lock 提交到仓库；如已提交可改为 uv sync --locked 保证严格复现
+
+      - name: Read version
+        id: version
+        shell: pwsh
+        run: |
+          $version = (uv run python -c "import dns_tools; print(dns_tools.__version__)").Trim()
+          if (-not $version) { Write-Error "未能从代码读取版本号"; exit 1 }
+          Add-Content $env:GITHUB_OUTPUT "tag=v$version"
+          Write-Output "本次发布版本: v$version"
 
       - name: Build EXE (PyInstaller)
         shell: pwsh
@@ -47,9 +60,34 @@ jobs:
             main.py
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
+      - name: Rename EXE with version tag
+        shell: pwsh
+        run: |
+          Rename-Item dist/dns-tools.exe "dns-tools-${{ steps.version.outputs.tag }}.exe"
+          Get-ChildItem dist | Select-Object Name, Length
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: dns-tools-windows-exe
-          path: dist/dns-tools.exe
+          path: dist/dns-tools-*.exe
           if-no-files-found: error
+
+      - name: Create Release and upload EXE
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $tag = "${{ steps.version.outputs.tag }}"
+          # 同版本号 Release 已存在时失败：升 __version__ 或先删除该 Release，避免静默覆盖已发布版本
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) {
+            Write-Error "Release $tag 已存在：请先升级 src/dns_tools/__init__.py 中的 __version__（或删除该 Release）后重试"
+            exit 1
+          }
+          gh release create $tag "dist/dns-tools-$tag.exe" `
+            --title "DNS Tools $tag" `
+            --notes "Windows 单文件版（PyInstaller 打包），双击即可运行。版本号 $tag 取自 src/dns_tools/__init__.py。" `
+            --generate-notes `
+            --target $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { exit 1 }
