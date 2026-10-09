@@ -1,0 +1,25 @@
+[project]
+name = "dns-tools"
+version = "0.3.0"
+description = "DNS 运维拨测桌面工具（PySide6 + dnspython）"
+readme = "README.md"
+authors = [
+    { name = "aiifan", email = "aiifan@foxmail.com" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "dnspython[doh]>=2.8.0",
+    "pyside6>=6.12.0",
+]
+
+[project.scripts]
+dns-tools = "dns_tools:main"
+
+[build-system]
+requires = ["uv_build>=0.12.18,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pyinstaller>=6.22.3",
+]

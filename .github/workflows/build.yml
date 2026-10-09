@@ -1,0 +1,55 @@
+name: Build Windows EXE
+
+# 仅手动触发：仓库页面 Actions -> Build Windows EXE -> Run workflow
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Install dependencies
+        run: uv sync
+        # 建议将 uv.lock 提交到仓库；如已提交可改为 uv sync --locked 保证严格复现
+
+      - name: Build EXE (PyInstaller)
+        shell: pwsh
+        run: |
+          # 存在自定义图标时一并打进 exe（文件图标 + 运行时加载）
+          $iconArgs = @()
+          if (Test-Path "assets/icon.ico") {
+            $iconArgs = @("--icon", "assets/icon.ico", "--add-data", "assets/icon.ico;assets")
+          }
+          uv run pyinstaller `
+            --noconfirm --clean --onefile --windowed `
+            --name dns-tools `
+            --paths src `
+            @iconArgs `
+            --exclude-module PyQt5 `
+            --exclude-module PyQt6 `
+            --exclude-module PySide2 `
+            --exclude-module PySide6.QtWebEngineCore `
+            --exclude-module PySide6.QtWebEngineWidgets `
+            --exclude-module PySide6.QtWebEngineQuick `
+            --exclude-module PySide6.QtPdf `
+            --exclude-module PySide6.QtPdfWidgets `
+            --exclude-module PySide6.QtQuick `
+            --exclude-module PySide6.QtQml `
+            --exclude-module PySide6.QtMultimedia `
+            --exclude-module PySide6.QtCharts `
+            main.py
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dns-tools-windows-exe
+          path: dist/dns-tools.exe
+          if-no-files-found: error
